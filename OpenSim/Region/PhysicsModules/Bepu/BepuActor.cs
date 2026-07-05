@@ -55,6 +55,9 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         private float _simulationSuspended;
         private int _angularLockAxes; // bitmask: 1=X, 2=Y, 4=Z
 
+        // Cached inertia for restore when toggling kinematic/dynamic or physical/non-physical
+        internal BodyInertia CachedInertia;
+
         // PID / MoveTo
         private Vector3 _pidTarget;
         private bool _pidActive;
@@ -310,7 +313,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu
             set => _buoyancy = value;
         }
 
-        public new bool FloatOnWater
+        public override bool FloatOnWater
         {
             get => _floatOnWater;
             set => _floatOnWater = value;

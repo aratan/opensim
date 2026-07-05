@@ -189,12 +189,27 @@ namespace OpenSim.Region.PhysicsModule.Bepu
             var snRotation = BepuUtil.ToSN(rotation);
             var snSize = BepuUtil.ToSN(size);
 
-            var bodyDescription = CreateBodyDescription(
-                ref snPosition, ref snRotation, ref snSize,
-                actor.Mass, isPhysical, localID);
+            BodyHandle handle;
+            TypedIndex shapeIndex = default;
+            try
+            {
+                var box = new Box(snSize.X, snSize.Y, snSize.Z);
+                shapeIndex = _simulation.Shapes.Add(box);
+                var inertia = box.ComputeInertia(actor.Mass);
 
-            var handle = _simulation.Bodies.Add(bodyDescription);
-            actor.SetBody(handle, bodyDescription.Collidable.Shape, actor.Mass);
+                var bodyDescription = CreateBodyDescription(
+                    ref snPosition, ref snRotation, shapeIndex,
+                    inertia, isPhysical);
+
+                handle = _simulation.Bodies.Add(bodyDescription);
+                actor.SetBody(handle, bodyDescription.Collidable.Shape, actor.Mass);
+            }
+            catch (Exception)
+            {
+                if (shapeIndex.Exists)
+                    _simulation.Shapes.Remove(shapeIndex);
+                throw;
+            }
 
             lock (_actorsLock)
             {
@@ -469,10 +484,25 @@ namespace OpenSim.Region.PhysicsModule.Bepu
                     var body = _simulation.Bodies.GetBodyReference(actor.BodyHandle);
                     if (isPhysical)
                     {
+                        // Restore cached inertia or compute from mass/size
+                        if (actor.CachedInertia.InverseMass > 0 || actor.CachedInertia.InverseInertiaTensor.XX > 0)
+                        {
+                            body.SetLocalInertia(actor.CachedInertia);
+                        }
+                        else
+                        {
+                            // Cache not populated (e.g. first-time toggle to physical) — compute from mass/size
+                            var snSize = BepuUtil.ToSN(actor.Size);
+                            var box = new Box(snSize.X, snSize.Y, snSize.Z);
+                            var inertia = box.ComputeInertia(actor.Mass);
+                            body.SetLocalInertia(inertia);
+                        }
                         body.Activity.SleepThreshold = 0.01f;
                     }
                     else
                     {
+                        // Cache current inertia for later restoration
+                        actor.CachedInertia = body.LocalInertia;
                         // Kinematic body for non-physical
                         body.SetLocalInertia(default);
                     }
@@ -489,12 +519,25 @@ namespace OpenSim.Region.PhysicsModule.Bepu
                     var body = _simulation.Bodies.GetBodyReference(actor.BodyHandle);
                     if (kinematic)
                     {
+                        // Cache current inertia before zeroing
+                        actor.CachedInertia = body.LocalInertia;
                         body.SetLocalInertia(default);
                     }
                     else
                     {
-                        // TODO: restore dynamic inertia when making body dynamic
-                        // Requires mass and shape info to compute proper inertia
+                        // Restore dynamic inertia from cache or compute from mass/size
+                        if (actor.CachedInertia.InverseMass > 0 || actor.CachedInertia.InverseInertiaTensor.XX > 0)
+                        {
+                            body.SetLocalInertia(actor.CachedInertia);
+                        }
+                        else
+                        {
+                            // Compute inertia from mass and size
+                            var snSize = BepuUtil.ToSN(actor.Size);
+                            var box = new Box(snSize.X, snSize.Y, snSize.Z);
+                            var inertia = box.ComputeInertia(actor.Mass);
+                            body.SetLocalInertia(inertia);
+                        }
                     }
                 }
             });
@@ -689,7 +732,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu
             }
 
             // For dynamic/kinematic bodies, look up by BodyHandle
-            if (_bodyHandleToActor.TryGetValue(new BodyHandle(collidable.BodyHandle.Value), out var actor))
+            if (_bodyHandleToActor.TryGetValue(collidable.BodyHandle, out var actor))
             {
                 localID = actor.LocalID;
                 return true;
@@ -716,13 +759,13 @@ namespace OpenSim.Region.PhysicsModule.Bepu
             if (contact.CollidableA.Mobility == CollidableMobility.Static)
             {
                 var staticRef = _simulation.Statics.GetStaticReference(
-                    new StaticHandle(contact.CollidableA.StaticHandle.Value));
+                    contact.CollidableA.StaticHandle);
                 return staticRef.Pose.Position + contact.Offset;
             }
             else
             {
                 var bodyRef = _simulation.Bodies.GetBodyReference(
-                    new BodyHandle(contact.CollidableA.BodyHandle.Value));
+                    contact.CollidableA.BodyHandle);
                 return bodyRef.Pose.Position + contact.Offset;
             }
         }
@@ -751,23 +794,21 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         private BodyDescription CreateBodyDescription(
             ref System.Numerics.Vector3 position,
             ref System.Numerics.Quaternion rotation,
-            ref System.Numerics.Vector3 size,
-            float mass, bool isPhysical, uint localID)
+            TypedIndex shapeIndex,
+            BodyInertia inertia,
+            bool isPhysical)
         {
-            var box = new Box(size.X, size.Y, size.Z);
-            var shapeIndex = _simulation.Shapes.Add(box);
-
             var pose = new RigidPose(position, rotation);
             var collidableDesc = new CollidableDescription(shapeIndex, 0.01f);
-            var activityDesc = new BodyActivityDescription { SleepThreshold = 0.01f, MinimumTimestepCountUnderThreshold = 0 };
 
-            if (isPhysical && mass > 0)
+            if (isPhysical && inertia.InverseMass > 0)
             {
-                var inertia = box.ComputeInertia(mass);
+                var activityDesc = new BodyActivityDescription { SleepThreshold = 0.01f, MinimumTimestepCountUnderThreshold = 0 };
                 return BodyDescription.CreateDynamic(pose, inertia, collidableDesc, activityDesc);
             }
             else
             {
+                var activityDesc = new BodyActivityDescription { SleepThreshold = 0.01f, MinimumTimestepCountUnderThreshold = 0 };
                 return BodyDescription.CreateKinematic(pose, collidableDesc, activityDesc);
             }
         }
@@ -811,7 +852,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         {
             if (collidable.Mobility == CollidableMobility.Dynamic || collidable.Mobility == CollidableMobility.Kinematic)
             {
-                if (_bodyHandleToActor.TryGetValue(new BodyHandle(collidable.BodyHandle.Value), out var actor))
+                if (_bodyHandleToActor.TryGetValue(collidable.BodyHandle, out var actor))
                     (friction, restitution) = actor.GetMaterialProperties();
             }
             // Statics keep the default values passed in
@@ -1015,9 +1056,19 @@ namespace OpenSim.Region.PhysicsModule.Bepu
 
         public override Dictionary<string, float> GetStats()
         {
+            if (!_initialized)
+                return new Dictionary<string, float>();
+
+            int totalBodies = 0;
+            for (int i = 0; i < _simulation.Bodies.Sets.Length; i++)
+            {
+                if (_simulation.Bodies.Sets[i].Allocated)
+                    totalBodies += _simulation.Bodies.Sets[i].Count;
+            }
+
             var stats = new Dictionary<string, float>
             {
-                ["BepuBodyCount"] = _simulation.Bodies.ActiveSet.Count,
+                ["BepuBodyCount"] = totalBodies,
                 ["BepuActiveBodyCount"] = _simulation.Bodies.ActiveSet.Count,
                 ["BepuStaticCount"] = _simulation.Statics.Count,
                 ["BepuConstraintCount"] = _simulation.Solver.CountConstraints(),
