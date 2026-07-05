@@ -223,15 +223,23 @@ flowchart TD
 
 | File | Lines | Role |
 |------|-------|------|
-| `BepuScene.cs` | 1261 | Main scene: simulation, terrain, raycasts, collisions, PID, buoyancy |
-| `BepuActor.cs` | 644 | Actor: all PhysicsActor members, collision events, material/PID helpers |
+| `BepuScene.cs` | 1262 | Main scene: simulation, terrain, raycasts, collisions, PID, buoyancy |
+| `BepuActor.cs` | 643 | Actor: all PhysicsActor members, collision events, material/PID helpers |
 | `BepuUtil.cs` | 66 | Type conversion between OpenMetaverse and System.Numerics |
 | `TRACKING.md` | 68 | Project tracker with progress and dependencies |
 
 ## Build
 
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) (or .NET 9 with `DOTNET_ROLL_FORWARD=LatestMajor`)
+- BepuPhysics v2.4.0 DLLs in `bin/` (`BepuPhysics.dll`, `BepuUtilities.dll`)
+
+### Build the module
+
 ```bash
-# Requires .NET 9 SDK and BepuPhysics NuGet
 ./runprebuild.sh
-dotnet build -c Release OpenSim.sln
+DOTNET_ROLL_FORWARD=LatestMajor dotnet build -c Debug OpenSim/Region/PhysicsModules/Bepu/OpenSim.Region.PhysicsModule.Bepu.csproj
 ```
+
+> **Note**: The module references BepuPhysics and BepuUtilities as DLLs from `bin/`, not as NuGet packages. Place the compiled assemblies there before building.
