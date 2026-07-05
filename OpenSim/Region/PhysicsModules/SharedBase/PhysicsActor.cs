@@ -425,7 +425,7 @@ namespace OpenSim.Region.PhysicsModules.SharedBase
         public abstract bool IsColliding { get; set; }
         public abstract bool CollidingGround { get; set; }
         public abstract bool CollidingObj { get; set; }
-        public virtual bool FloatOnWater { set { return; } }
+        public virtual bool FloatOnWater { get; set; }
         public abstract Vector3 RotationalVelocity { get; set; }
         public abstract bool Kinematic { get; set; }
         public abstract float Buoyancy { get; set; }

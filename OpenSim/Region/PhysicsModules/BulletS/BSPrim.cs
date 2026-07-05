@@ -1114,6 +1114,7 @@ namespace OpenSim.Region.PhysicsModule.BulletS
             }
         }
         public override bool FloatOnWater {
+            get => _floatOnWater;
             set {
                 _floatOnWater = value;
                 PhysScene.TaintedObject(LocalID, "BSPrim.setFloatOnWater", delegate()
