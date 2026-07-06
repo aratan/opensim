@@ -136,3 +136,6 @@ mydatabase.db
 
 # SDD spec artifacts (optional - remove if sharing specs)
 openspec/
+
+# BepuPhysics test build output (NUnit 3 / dotnet test)
+bin/BepuTests/

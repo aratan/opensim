@@ -33,12 +33,12 @@ namespace OpenSim.Region.PhysicsModule.Bepu.Tests
     [TestFixture]
     public class BepuSceneTests : OpenSimTestCase
     {
-        [TestFixtureSetUp]
+        [OneTimeSetUp]
         public void Init()
         {
         }
 
-        [TestFixtureTearDown]
+        [OneTimeTearDown]
         public void TearDown()
         {
         }
