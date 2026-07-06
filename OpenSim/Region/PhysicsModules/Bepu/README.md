@@ -216,16 +216,17 @@ flowchart TD
 | 3 - Abstract Contract | ✅ Done | All 48 PhysicsActor members, all PhysicsScene overrides |
 | 4 - Collision Pipeline | ✅ Done | Narrow phase callbacks, contact buffering, collision dispatch |
 | 5 - Per-Actor Control | ✅ Done | Materials, PID/MoveTo, buoyancy, angular lock, gravity |
-| 6 - Terrain Mesh | 🔲 Pending | Build real Mesh from heightmap instead of flat box |
-| 7 - Buoyancy/Vehicles | 🔲 Pending | Water plane collision, vehicle constraints |
+| 6 - Module Integration | ✅ Done | INonSharedRegionModule — loads via OpenSim plugin system, auto-initializes per-region, registers PhysicsScene interface |
+| 7 - Terrain Mesh | 🔲 Pending | Build real Mesh from heightmap instead of flat box |
+| 8 - Buoyancy/Vehicles | 🔲 Pending | Water plane collision, vehicle constraints |
 
 ## Files
 
 | File | Lines | Role |
 |------|-------|------|
-| `BepuScene.cs` | 1262 | Main scene: simulation, terrain, raycasts, collisions, PID, buoyancy |
-| `BepuActor.cs` | 643 | Actor: all PhysicsActor members, collision events, material/PID helpers |
-| `BepuUtil.cs` | 66 | Type conversion between OpenMetaverse and System.Numerics |
+| `BepuScene.cs` | 1441 | Main scene: simulation, terrain, raycasts, collisions, PID, buoyancy, INonSharedRegionModule |
+| `BepuActor.cs` | 646 | Actor: all PhysicsActor members, collision events, material/PID helpers |
+| `BepuUtil.cs` | 65 | Type conversion between OpenMetaverse and System.Numerics |
 | `TRACKING.md` | 68 | Project tracker with progress and dependencies |
 
 ## Build
