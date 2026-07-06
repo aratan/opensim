@@ -495,8 +495,46 @@ namespace OpenSim.Framework.Console
             {
                 Show();
                 //Reduce collisions with internal read terminal information like cursor position on linux
-                while(System.Console.KeyAvailable == false)
-                    Thread.Sleep(100);
+                try
+                {
+                    while(System.Console.KeyAvailable == false)
+                        Thread.Sleep(100);
+                }
+                catch (InvalidOperationException)
+                {
+                    // stdin is redirected (e.g. nohup, background) -> fall back to simple line read
+                    // Don't print prompt since nobody can see it
+                    Show();
+                    string fallbackLine = System.Console.In.ReadLine();
+                    if (fallbackLine == null)
+                    {
+                        // /dev/null or pipe with no data — sleep long, no prompt spam
+                        Thread.Sleep(60000);
+                        continue;
+                    }
+
+                    lock (m_commandLine)
+                    {
+                        m_commandLine.Clear();
+                        m_commandLine.Append(fallbackLine);
+                    }
+
+                    // Must replicate the same command resolution as the Enter key path (lines 622-637)
+                    if (isCommand)
+                    {
+                        string[] cmd = Commands.Resolve(Parser.Parse(fallbackLine));
+                        if (cmd.Length != 0)
+                        {
+                            AddToHistory(fallbackLine);
+                            return String.Empty;
+                        }
+                    }
+
+                    if (m_echo && fallbackLine != "")
+                        AddToHistory(fallbackLine);
+
+                    return fallbackLine;
+                }
 
                 ConsoleKeyInfo key = System.Console.ReadKey(true);
 
