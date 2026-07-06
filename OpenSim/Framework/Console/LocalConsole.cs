@@ -476,6 +476,13 @@ namespace OpenSim.Framework.Console
 
         public override string ReadLine(string p, bool isCommand, bool e)
         {
+            // When stdin is redirected (e.g. running via IDE, pipe, or headless),
+            // Console.KeyAvailable throws InvalidOperationException.
+            // Delegate to CommandConsole.ReadLine which uses Console.ReadLine()
+            // and still processes isCommand resolution.
+            if (System.Console.IsInputRedirected)
+                return base.ReadLine(p, isCommand, e);
+
             m_cursorXPosition = 0;
             prompt = p;
             m_echo = e;
