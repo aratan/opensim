@@ -76,6 +76,15 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         {
         }
 
+        /// <summary>
+        /// Initialises the Bepu physics engine. Must be called before any other operation.
+        /// </summary>
+        public void Init()
+        {
+            if (_initialized) return;
+            InitializePhysics(Vector3.Zero);
+        }
+
         private void InitializePhysics(Vector3 regionExtent)
         {
             _bufferPool = new BufferPool(DefaultAllocatorPoolSize);
@@ -90,7 +99,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu
                 _bufferPool,
                 narrowPhase,
                 new BepuPoseIntegratorCallbacks(new System.Numerics.Vector3(0, 0, DefaultGravityZ)),
-                new SolveDescription()
+                new SolveDescription(velocityIterationCount: 8, substepCount: 1)
             );
 
             _threadDispatcher = new ThreadDispatcher(Environment.ProcessorCount > 1 ? Environment.ProcessorCount - 1 : 1);
