@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenSim.Framework;
+using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using BepuPhysics;
@@ -22,7 +23,7 @@ using Vector3 = OpenMetaverse.Vector3;
 namespace OpenSim.Region.PhysicsModule.Bepu
 {
     [Mono.Addins.Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "BepuPhysicsScene")]
-    public sealed class BepuScene : PhysicsScene
+    public sealed class BepuScene : PhysicsScene, INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private const string LogHeader = "[BEPU SCENE]";
@@ -30,6 +31,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         private bool _initialized;
         private bool _enabled;
         private string _regionName;
+        private IConfigSource _config;
 
         // Bepu core types
         private BufferPool _bufferPool;
@@ -107,6 +109,121 @@ namespace OpenSim.Region.PhysicsModule.Bepu
             _initialized = true;
             m_log.InfoFormat("{0} BepuPhysics initialized. Gravity={1}, Threads={2}",
                 LogHeader, DefaultGravityZ, _threadDispatcher.ThreadCount);
+        }
+
+        #endregion
+
+        #region INonSharedRegionModule
+
+        /// <summary>
+        /// Name used by the module loader. Must match the "physics" setting in OpenSim.ini
+        /// under the [Startup] section (physics = BepuPhysics).
+        /// </summary>
+        public string Name
+        {
+            get { return "BepuPhysics"; }
+        }
+
+        /// <summary>
+        /// If this module can be replaced by another module implementing the same interface,
+        /// return that interface type. Null means this module is not replaceable.
+        /// </summary>
+        public Type ReplaceableInterface
+        {
+            get { return null; }
+        }
+
+        /// <summary>
+        /// Called by the module loader after creating the region instance.
+        /// Checks whether this physics engine is the selected one and caches
+        /// the config source for later initialization.
+        /// </summary>
+        public void Initialise(IConfigSource source)
+        {
+            IConfig startupConfig = source.Configs["Startup"];
+            if (startupConfig != null)
+            {
+                string physics = startupConfig.GetString("physics", string.Empty);
+                if (physics == Name)
+                {
+                    _config = source;
+                    _enabled = true;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Called when the module is being shut down.
+        /// </summary>
+        public void Close()
+        {
+            if (_initialized)
+                Dispose();
+
+            _enabled = false;
+            _config = null;
+        }
+
+        /// <summary>
+        /// Called when a region is added to this module instance.
+        /// For non-shared modules this happens exactly once, after Initialise().
+        /// Initializes the physics engine, registers the PhysicsScene interface,
+        /// and sets up terrain and water from the scene.
+        /// </summary>
+        public void AddRegion(Scene scene)
+        {
+            if (!_enabled)
+                return;
+
+            _regionName = scene.RegionInfo.RegionName;
+            PhysicsSceneName = Name + "/" + _regionName;
+
+            // Register this PhysicsScene so other modules can find it
+            scene.RegisterModuleInterface<PhysicsScene>(this);
+
+            // Determine region extent
+            var extent = new OpenMetaverse.Vector3(
+                scene.RegionInfo.RegionSizeX,
+                scene.RegionInfo.RegionSizeY,
+                scene.RegionInfo.RegionSizeZ);
+
+            // Initialize the Bepu physics engine
+            InitializePhysics(extent);
+
+            // Set up terrain and water through the base class helper
+            float[] terrain = scene.Heightmap?.GetFloatsSerialised()
+                ?? new float[scene.RegionInfo.RegionSizeX * scene.RegionInfo.RegionSizeY];
+            float waterHeight = (float)(scene.RegionInfo.RegionSettings?.WaterHeight ?? 20.0);
+
+            base.Initialise(scene.PhysicsRequestAsset, terrain, waterHeight);
+
+            EngineName = Name;
+            EngineType = Name;
+        }
+
+        /// <summary>
+        /// Called when the region is removed from this module instance.
+        /// </summary>
+        public void RemoveRegion(Scene scene)
+        {
+            if (!_enabled)
+                return;
+
+            if (_initialized)
+                Dispose();
+        }
+
+        /// <summary>
+        /// Called after all modules have had AddRegion called for this scene.
+        /// Enables physics on the scene and performs any final setup that
+        /// requires other modules to be present.
+        /// </summary>
+        public void RegionLoaded(Scene scene)
+        {
+            if (!_enabled)
+                return;
+
+            scene.PhysicsEnabled = true;
         }
 
         #endregion
