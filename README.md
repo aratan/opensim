@@ -113,5 +113,35 @@ More extensive information on building, running, and configuring
 OpenSim, as well as how to report bugs, and participate in the OpenSim
 project can always be found at http://opensimulator.org.
 
+# Optional Physics Engine
+
+OpenSim ships with a **BepuPhysics v2** module that can be selected instead of the default BulletSim engine.
+
+### Enabling BepuPhysics
+
+In `bin/OpenSim.ini`, under the `[Startup]` section:
+
+```ini
+physics = BepuPhysics
+```
+
+BepuPhysics auto-initializes per-region with terrain and water from the scene configuration, registers itself as the `PhysicsScene` interface, and enables physics when the region loads. It handles:
+
+- Rigid body simulation (boxes, spheres, primitives)
+- Terrain collision using heightmap
+- Water buoyancy
+- Raycasting (single-hit, multi-hit, filtered)
+- PID-based MoveTo control and angular locks
+- Collision events per-actor with throttling
+
+### Prerequisites
+
+- [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) (or .NET 9 with `DOTNET_ROLL_FORWARD=LatestMajor`)
+- BepuPhysics v2.4.0 DLLs in `bin/` (`BepuPhysics.dll`, `BepuUtilities.dll`)
+
+# BepuPhysics Module
+
+See [OpenSim/Region/PhysicsModules/Bepu/README.md](OpenSim/Region/PhysicsModules/Bepu/README.md) for architecture, phases, and build instructions.
+
 Thanks for trying OpenSim, we hope it is a pleasant experience.
 
