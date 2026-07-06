@@ -491,7 +491,16 @@ namespace OpenSim.Region.Framework.Scenes
 
         public new float TimeDilation
         {
-            get { return m_sceneGraph.PhysicsScene.TimeDilation; }
+            get
+            {
+                // PhysicsScene may be null during shutdown after SceneGraph.Close() nulls it
+                // while the heartbeat thread is still running (race condition).
+                // Return 1.0 (no dilation) as the safe default when no physics engine is available.
+                PhysicsScene ps = m_sceneGraph.PhysicsScene;
+                if (ps is null)
+                    return 1.0f;
+                return ps.TimeDilation;
+            }
         }
 
         public void setThreadCount(int inUseThreads)
