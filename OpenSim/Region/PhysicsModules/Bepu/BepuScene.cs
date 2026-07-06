@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using BepuPhysics;
 using BepuPhysics.Collidables;
@@ -22,7 +23,7 @@ using Vector3 = OpenMetaverse.Vector3;
 namespace OpenSim.Region.PhysicsModule.Bepu
 {
     [Mono.Addins.Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "BepuPhysicsScene")]
-    public sealed class BepuScene : PhysicsScene
+    public sealed class BepuScene : PhysicsScene, INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private const string LogHeader = "[BEPU SCENE]";
@@ -30,6 +31,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         private bool _initialized;
         private bool _enabled;
         private string _regionName;
+        private IConfigSource _config;
 
         // Bepu core types
         private BufferPool _bufferPool;
@@ -70,20 +72,137 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         // Time dilation tracking
         private float _timeDilation = 1.0f;
 
-        #region Constructor
+        #region INonSharedRegionModule
 
-        public BepuScene()
+        public string Name
         {
+            get { return "BepuPhysics"; }
+        }
+
+        public Type ReplaceableInterface
+        {
+            get { return null; }
+        }
+
+        public void Initialise(IConfigSource source)
+        {
+            IConfig config = source.Configs["Startup"];
+            if (config != null)
+            {
+                string physics = config.GetString("physics", string.Empty);
+                if (physics == Name)
+                {
+                    string mesher = config.GetString("meshing", string.Empty);
+                    if (string.IsNullOrEmpty(mesher) || !mesher.Equals("Meshmerizer"))
+                    {
+                        m_log.Error("[BepuPhysics] OpenSim.ini meshing option must be set to \"Meshmerizer\"");
+                        throw new Exception("Invalid physics meshing option");
+                    }
+
+                    _enabled = true;
+                    _config = source;
+                }
+            }
+        }
+
+        public void Close()
+        {
+            if (!_enabled)
+                return;
+
+            CleanupPhysics();
+        }
+
+        public void AddRegion(Scene scene)
+        {
+            if (!_enabled)
+                return;
+
+            _regionName = scene.RegionInfo.RegionName;
+
+            scene.RegisterModuleInterface<PhysicsScene>(this);
+            InitializePhysics(Vector3.Zero);
+
+            base.Initialise(scene.PhysicsRequestAsset,
+                (scene.Heightmap != null ? scene.Heightmap.GetFloatsSerialised() : new float[scene.RegionInfo.RegionSizeX * scene.RegionInfo.RegionSizeY]),
+                (float)scene.RegionInfo.RegionSettings.WaterHeight);
+        }
+
+        public void RemoveRegion(Scene scene)
+        {
+            if (!_enabled)
+                return;
+
+            m_log.InfoFormat("{0} Removing BepuPhysics for region {1}", LogHeader, _regionName);
+
+            scene.PhysicsEnabled = false;
+            CleanupPhysics();
         }
 
         /// <summary>
-        /// Initialises the Bepu physics engine. Must be called before any other operation.
+        /// Release all BepuPhysics resources: actors, terrain, simulation, thread dispatcher, and buffer pool.
+        /// Safe to call multiple times — subsequent calls are no-ops.
         /// </summary>
-        public void Init()
+        private void CleanupPhysics()
         {
-            if (_initialized) return;
-            InitializePhysics(Vector3.Zero);
+            if (!_initialized)
+                return;
+
+            m_log.DebugFormat("{0} Cleaning up BepuPhysics resources", LogHeader);
+
+            // 1. Remove all actors from the simulation
+            lock (_actorsLock)
+            {
+                foreach (var kvp in _actors)
+                {
+                    if (kvp.Value is BepuActor bepuActor && bepuActor.HasBody)
+                    {
+                        _bodyHandleToActor.Remove(bepuActor.BodyHandle);
+                        _simulation.Bodies.Remove(bepuActor.BodyHandle);
+                        bepuActor.RemoveBody();
+                    }
+                }
+                _actors.Clear();
+                _bodyHandleToActor.Clear();
+            }
+
+            // 2. Remove terrain if present
+            if (_hasTerrain)
+            {
+                _simulation.Statics.Remove(_terrainStaticHandle);
+                _simulation.Shapes.Remove(_terrainShapeIndex);
+                _hasTerrain = false;
+            }
+
+            // 3. Clear pending actions and state
+            while (_bodyActions.TryDequeue(out _)) { }
+            while (_scheduledUpdates.TryDequeue(out _)) { }
+            _activeCollisions.Clear();
+            _contactBuffer.Clear();
+            _pidStates.Clear();
+            _terrainHeightMap = null;
+
+            // 4. Dispose Bepu core resources (order matters: simulation first, then pool)
+            _simulation.Dispose();
+            _threadDispatcher.Dispose();
+            _bufferPool.Clear();
+
+            _initialized = false;
+
+            m_log.InfoFormat("{0} BepuPhysics resources released", LogHeader);
         }
+
+        public void RegionLoaded(Scene scene)
+        {
+            if (!_enabled)
+                return;
+
+            scene.PhysicsEnabled = true;
+
+            m_log.InfoFormat("{0} BepuPhysics v2 initialized for region {1}", LogHeader, _regionName);
+        }
+
+        #endregion
 
         private void InitializePhysics(Vector3 regionExtent)
         {
@@ -108,8 +227,6 @@ namespace OpenSim.Region.PhysicsModule.Bepu
             m_log.InfoFormat("{0} BepuPhysics initialized. Gravity={1}, Threads={2}",
                 LogHeader, DefaultGravityZ, _threadDispatcher.ThreadCount);
         }
-
-        #endregion
 
         #region PhysicsScene abstract overrides
 
