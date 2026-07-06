@@ -44,7 +44,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu.Tests
         private static readonly Vector3 TargetPos = new Vector3(100f, 100f, 50f);
         private static readonly Vector3 TargetSize = new Vector3(10f, 10f, 10f);
 
-        [TestFixtureSetUp]
+        [OneTimeSetUp]
         public void Init()
         {
             _physicsScene = BepuTestsUtil.CreateBasicPhysicsEngine(null);
@@ -90,7 +90,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu.Tests
             }
         }
 
-        [TestFixtureTearDown]
+        [OneTimeTearDown]
         public void TearDown()
         {
             if (_physicsScene != null)

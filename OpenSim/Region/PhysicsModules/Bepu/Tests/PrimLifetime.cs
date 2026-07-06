@@ -40,7 +40,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu.Tests
         private const uint _localID = 42;
         private PhysicsActor _prim;
 
-        [TestFixtureSetUp]
+        [OneTimeSetUp]
         public void Init()
         {
             _physicsScene = BepuTestsUtil.CreateBasicPhysicsEngine(null);
@@ -68,7 +68,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu.Tests
             Assert.That(result, Is.EqualTo(1.0f), "Simulate should return 1.0f for one timestep");
         }
 
-        [TestFixtureTearDown]
+        [OneTimeTearDown]
         public void TearDown()
         {
             if (_physicsScene != null)
