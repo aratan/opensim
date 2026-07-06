@@ -1600,6 +1600,37 @@
       </Files>
     </Project>
 
+    <!-- BepuPhysics v2 Tests -->
+    <Project name="OpenSim.Region.PhysicsModule.Bepu.Tests" path="OpenSim/Region/PhysicsModules/Bepu/Tests" type="Library">
+      <Configuration name="Debug">
+        <Options>
+          <OutputPath>../../../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+      <Configuration name="Release">
+        <Options>
+          <OutputPath>../../../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+
+      <ReferencePath>../../../../../bin/</ReferencePath>
+      <Reference name="Nini" path="../../../../../bin/"/>
+      <Reference name="log4net" path="../../../../../bin/"/>
+      <Reference name="nunit.framework" path="../../../../../bin/"/>
+      <Reference name="OpenMetaverse" path="../../../../../bin/"/>
+      <Reference name="OpenMetaverseTypes" path="../../../../../bin/"/>
+      <Reference name="OpenSim.Framework"/>
+      <Reference name="OpenSim.Tests.Common"/>
+      <Reference name="OpenSim.Region.Framework"/>
+      <Reference name="OpenSim.Region.PhysicsModule.Meshing"/>
+      <Reference name="OpenSim.Region.PhysicsModules.SharedBase"/>
+      <Reference name="OpenSim.Region.PhysicsModule.Bepu"/>
+
+      <Files>
+        <Match pattern="*.cs" recurse="false"/>
+      </Files>
+    </Project>
+
     <!-- BepuPhysics v2 (Apache 2.0) — replacement physics engine -->
     <Project name="OpenSim.Region.PhysicsModule.Bepu" path="OpenSim/Region/PhysicsModules/Bepu" type="Library">
       <Configuration name="Debug">
