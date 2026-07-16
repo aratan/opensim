@@ -660,6 +660,9 @@ namespace OpenSim.Framework.Console
 
         public static string[] Parse(string text)
         {
+            if (string.IsNullOrEmpty(text))
+                return Array.Empty<string>();
+
             List<string> result = new List<string>();
 
             int index;
@@ -756,7 +759,7 @@ namespace OpenSim.Framework.Console
         {
             string line = ReadLine(DefaultPrompt + "# ", true, true);
 
-            if (line != String.Empty)
+            if (!string.IsNullOrEmpty(line))
                 Output("Invalid command");
         }
 
@@ -770,6 +773,9 @@ namespace OpenSim.Framework.Console
         {
             System.Console.Write("{0}", p);
             string cmdinput = System.Console.ReadLine();
+
+            if (cmdinput == null)
+                return String.Empty;
 
             if (isCommand)
             {
