@@ -133,7 +133,6 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             m_timeOutTimer .AutoReset = false;
             m_timeOutTimer.Elapsed += OnTimeout;
             m_timeout = false;
-            int gccontrol = 0;
 
             foreach (KeyValuePair<UUID, sbyte> kvp in m_uuids)
             {
@@ -173,11 +172,6 @@ namespace OpenSim.Region.CoreModules.World.Archiver
 
                     m_foundAssetUuids.Add(asset.FullID);
                     m_assetsArchiver.WriteAsset(PostProcess(asset));
-                    if(++gccontrol > 10000)
-                    {
-                        gccontrol = 0;
-                        GC.Collect();
-                    }
                 }
 
                 catch (Exception e)
@@ -197,7 +191,6 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 m_log.DebugFormat("[ARCHIVER]: Successfully added {0} assets ({1} of total possible assets requested were not found, were damaged or were not assets)",
                             m_foundAssetUuids.Count, totalerrors);
 
-            GC.Collect();
             PerformAssetsRequestCallback(m_timeout);
         }
   

@@ -277,11 +277,6 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             m_colors = null;
             m_warpTextures = null;
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
             return bitmap;
         }
 

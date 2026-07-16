@@ -205,12 +205,6 @@ namespace OpenSim.Region.OptionalModules.Scripting.RegionReady
             m_scene.EventManager.OnEmptyScriptCompileQueue -= OnEmptyScriptCompileQueue;
             m_scene.LoginLock = false;
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
-
             if (!m_scene.StartDisabled)
             {
                 m_scene.LoginsEnabled = true;
