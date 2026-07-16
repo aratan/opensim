@@ -118,6 +118,9 @@ test-results/
 doc/html
 doc/doxygen.error.log
 bin/OpenSim.ini
+bin/OpenSim.log.old
+bin/*.db-shm
+bin/*.db-wal
 
 *.patch
 
