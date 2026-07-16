@@ -126,6 +126,14 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                         }
                     }
 
+                    // Security: Require at least one access restriction (password or IP list)
+                    if (m_requiredPassword == String.Empty && m_accessIP.Count == 0)
+                    {
+                        m_log.Warn("[RADMIN]: RemoteAdmin is enabled with NO access restrictions! Set 'access_password' or 'access_ip_addresses' in [RemoteAdmin] config. Disabling RemoteAdmin for security.");
+                        m_config.Set("enabled", false);
+                        return;
+                    }
+
                     m_application = openSim;
                     string bind_ip_address = m_config.GetString("bind_ip_address", "0.0.0.0");
                     IPAddress ipaddr = IPAddress.Parse(bind_ip_address);
@@ -261,11 +269,21 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                 throw new Exception("not authorized");
             }
 
-            if (m_requiredPassword != String.Empty && password != m_requiredPassword)
+            if (m_requiredPassword != String.Empty)
             {
-                m_log.WarnFormat("[RADMIN]: Wrong password, blocked access from IP {0}", check_ip_address);
+                if (password != m_requiredPassword)
+                {
+                    m_log.WarnFormat("[RADMIN]: Wrong password, blocked access from IP {0}", check_ip_address);
+                    responseData["accepted"] = false;
+                    throw new Exception("wrong password");
+                }
+            }
+            else if (m_accessIP.Count == 0)
+            {
+                // This should never be reached due to the check at startup, but as a safety net:
+                m_log.ErrorFormat("[RADMIN]: No password and no IP restrictions configured — blocking access from IP {0}", check_ip_address);
                 responseData["accepted"] = false;
-                throw new Exception("wrong password");
+                throw new Exception("access denied: no authentication configured");
             }
         }
 
