@@ -47,6 +47,7 @@ namespace OpenSim.Server.Handlers.Inventory
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected IInventoryService m_InventoryService;
+        protected IPresenceService m_PresenceService;
 
         private bool m_doLookup = false;
 
@@ -78,6 +79,19 @@ namespace OpenSim.Server.Handlers.Inventory
 
             m_userserver_url = serverConfig.GetString("UserServerURI", String.Empty);
             m_doLookup = serverConfig.GetBoolean("SessionAuthentication", false);
+
+            string presenceService = serverConfig.GetString("PresenceServiceModule", String.Empty);
+            if (presenceService.Length > 0)
+            {
+                Object[] presArgs = new Object[] { config };
+                m_PresenceService =
+                    ServerUtils.LoadPlugin<IPresenceService>(presenceService, presArgs);
+            }
+
+            if (m_PresenceService != null)
+                m_log.Info("[INVENTORY HANDLER]: PresenceService loaded for session authentication");
+            else
+                m_log.Warn("[INVENTORY HANDLER]: PresenceService not configured - session authentication disabled");
 
             AddHttpHandlers(server);
             m_log.Debug("[INVENTORY HANDLER]: handlers initialized");
@@ -333,6 +347,46 @@ namespace OpenSim.Server.Handlers.Inventory
         /// <returns></returns>
         public virtual bool CheckAuthSession(string session_id, string avatar_id)
         {
+            if (m_PresenceService == null)
+                return true;
+
+            UUID sessionUUID;
+            UUID avatarUUID;
+
+            if (!UUID.TryParse(session_id, out sessionUUID))
+            {
+                m_log.WarnFormat(
+                    "[INVENTORY IN CONNECTOR]: Rejecting request with invalid session UUID '{0}'",
+                    session_id);
+                return false;
+            }
+
+            if (!UUID.TryParse(avatar_id, out avatarUUID))
+            {
+                m_log.WarnFormat(
+                    "[INVENTORY IN CONNECTOR]: Rejecting request with invalid avatar UUID '{0}'",
+                    avatar_id);
+                return false;
+            }
+
+            PresenceInfo presenceInfo = m_PresenceService.GetAgent(sessionUUID);
+
+            if (presenceInfo == null)
+            {
+                m_log.WarnFormat(
+                    "[INVENTORY IN CONNECTOR]: Rejecting request - no presence found for session {0}",
+                    sessionUUID);
+                return false;
+            }
+
+            if (presenceInfo.UserID != avatar_id)
+            {
+                m_log.WarnFormat(
+                    "[INVENTORY IN CONNECTOR]: Rejecting request - session {0} belongs to user {1}, not {2}",
+                    sessionUUID, presenceInfo.UserID, avatar_id);
+                return false;
+            }
+
             return true;
         }
 
