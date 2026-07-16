@@ -32,6 +32,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection.Emit;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
@@ -1691,14 +1692,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             }
             else if(graph is ScriptThrownException ScriptThrownExceptiongraph)
             {
-                MemoryStream memoryStream = new MemoryStream();
-                System.Runtime.Serialization.Formatters.Binary.BinaryFormatter bformatter =
-                        new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-                bformatter.Serialize(memoryStream, graph);
-                byte[] rawBytes = memoryStream.ToArray();
                 mow.Write((byte)Ser.THROWNEX);
-                mow.Write((int)rawBytes.Length);
-                mow.Write(rawBytes);
                 SendObjValue(ScriptThrownExceptiongraph.thrown);
             }
             else
@@ -1981,15 +1975,10 @@ namespace OpenSim.Region.ScriptEngine.Yengine
 
                 case Ser.THROWNEX:
                 {
-                    int rawLength = mir.ReadInt32();
-                    byte[] rawBytes = mir.ReadBytes(rawLength);
-                    MemoryStream memoryStream = new MemoryStream(rawBytes);
-                    System.Runtime.Serialization.Formatters.Binary.BinaryFormatter bformatter =
-                            new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-                    object graph = bformatter.Deserialize(memoryStream);
-                    this.migrateInObjects.Add(ident, graph);
-                    ((ScriptThrownException)graph).thrown = RecvObjValue();
-                    return graph;
+                    object thrownValue = RecvObjValue();
+                    ScriptThrownException ste = (ScriptThrownException)ScriptThrownException.Wrap(thrownValue);
+                    this.migrateInObjects.Add(ident, ste);
+                    return ste;
                 }
 
                 default:

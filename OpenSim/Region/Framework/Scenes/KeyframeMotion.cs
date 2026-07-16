@@ -39,7 +39,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Runtime.Serialization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Timer = System.Timers.Timer;
 using log4net;
 
@@ -197,7 +198,6 @@ namespace OpenSim.Region.Framework.Scenes
             Rotation = 1
         }
 
-        [Serializable]
         public struct Keyframe
         {
             public Vector3? Position;
@@ -208,6 +208,21 @@ namespace OpenSim.Region.Framework.Scenes
             public Vector3 AngularVelocity;
             public Vector3 StartPosition;
         };
+
+        // DTO for System.Text.Json serialization
+        private class KeyframeMotionData
+        {
+            public Vector3 SerializedPosition { get; set; }
+            public Vector3 BasePosition { get; set; }
+            public Quaternion BaseRotation { get; set; }
+            public List<Keyframe> Frames { get; set; }
+            public Keyframe[] Keyframes { get; set; }
+            public PlayMode Mode { get; set; }
+            public DataFormat DataFmt { get; set; }
+            public bool Running { get; set; }
+            public int Iterations { get; set; }
+            public int SkipLoops { get; set; }
+        }
 
         private Vector3 m_serializedPosition;
         private Vector3 m_basePosition;
@@ -314,8 +329,31 @@ namespace OpenSim.Region.Framework.Scenes
             {
                 using (MemoryStream ms = new MemoryStream(data))
                 {
-                    BinaryFormatter fmt = new BinaryFormatter();
-                    newMotion = (KeyframeMotion)fmt.Deserialize(ms);
+                    int firstByte = ms.ReadByte();
+                    ms.Position = 0;
+
+                    if (firstByte == '{' || firstByte == '[')
+                    {
+                        var dto = JsonSerializer.Deserialize<KeyframeMotionData>(ms);
+                        newMotion = new KeyframeMotion();
+                        newMotion.m_serializedPosition = dto.SerializedPosition;
+                        newMotion.m_basePosition = dto.BasePosition;
+                        newMotion.m_baseRotation = dto.BaseRotation;
+                        newMotion.m_frames = dto.Frames ?? new List<Keyframe>();
+                        newMotion.m_keyframes = dto.Keyframes;
+                        newMotion.m_mode = dto.Mode;
+                        newMotion.m_data = dto.DataFmt;
+                        newMotion.m_running = dto.Running;
+                        newMotion.m_iterations = dto.Iterations;
+                        newMotion.m_skipLoops = dto.SkipLoops;
+                    }
+                    else
+                    {
+#pragma warning disable SYSLIB0011
+                        BinaryFormatter fmt = new BinaryFormatter();
+                        newMotion = (KeyframeMotion)fmt.Deserialize(ms);
+#pragma warning restore SYSLIB0011
+                    }
                 }
 
                 newMotion.m_group = grp;
@@ -376,6 +414,10 @@ namespace OpenSim.Region.Framework.Scenes
 
             if (m_running)
                 Start();
+        }
+
+        private KeyframeMotion()
+        {
         }
 
         public KeyframeMotion(SceneObjectGroup grp, PlayMode mode, DataFormat data)
@@ -836,10 +878,24 @@ namespace OpenSim.Region.Framework.Scenes
 
             using (MemoryStream ms = new MemoryStream())
             {
-                BinaryFormatter fmt = new BinaryFormatter();
                 if (!m_selected && tmp != null)
                     m_serializedPosition = tmp.AbsolutePosition;
-                fmt.Serialize(ms, this);
+
+                var dto = new KeyframeMotionData
+                {
+                    SerializedPosition = m_serializedPosition,
+                    BasePosition = m_basePosition,
+                    BaseRotation = m_baseRotation,
+                    Frames = m_frames,
+                    Keyframes = m_keyframes,
+                    Mode = m_mode,
+                    DataFmt = m_data,
+                    Running = m_running,
+                    Iterations = m_iterations,
+                    SkipLoops = m_skipLoops
+                };
+                JsonSerializer.Serialize(ms, dto);
+
                 m_group = tmp;
                 if (!timerWasStopped && m_running && !m_waitingCrossing)
                     StartTimer();

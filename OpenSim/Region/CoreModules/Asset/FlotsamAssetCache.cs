@@ -29,7 +29,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.Serialization.Formatters.Binary;
+using System.Text.Json;
 using System.Text;
 using System.Threading;
 using System.Timers;
@@ -44,6 +44,7 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using System.Runtime.InteropServices;
+using System.Runtime.Serialization.Formatters.Binary;
 
 
 namespace OpenSim.Region.CoreModules.Asset
@@ -526,8 +527,21 @@ namespace OpenSim.Region.CoreModules.Asset
                 if (stream.Length == 0) // Empty file will trigger exception below
                     return null;
 
-                BinaryFormatter bformatter = new();
-                asset = (AssetBase)bformatter.Deserialize(stream);
+                // Peek first byte to detect format: '{' or '[' = JSON, else legacy BinaryFormatter
+                int firstByte = stream.ReadByte();
+                stream.Position = 0;
+
+                if (firstByte == '{' || firstByte == '[')
+                {
+                    asset = JsonSerializer.Deserialize<AssetBase>(stream);
+                }
+                else
+                {
+#pragma warning disable SYSLIB0011
+                    BinaryFormatter bformatter = new();
+                    asset = (AssetBase)bformatter.Deserialize(stream);
+#pragma warning restore SYSLIB0011
+                }
 
                 m_DiskHits++;
             }
@@ -537,7 +551,7 @@ namespace OpenSim.Region.CoreModules.Asset
             catch (DirectoryNotFoundException)
             {
             }
-            catch (System.Runtime.Serialization.SerializationException e)
+            catch (JsonException e)
             {
                 m_log.Warn($"[FLOTSAM ASSET CACHE]: Failed to get file {filename} for asset {id}: {e.Message}");
 
@@ -1013,8 +1027,7 @@ namespace OpenSim.Region.CoreModules.Asset
 
                     using (Stream stream = File.Open(tempname, FileMode.Create))
                     {
-                        BinaryFormatter bformatter = new();
-                        bformatter.Serialize(stream, asset);
+                        JsonSerializer.Serialize(stream, asset);
                         stream.Flush();
                     }
                     m_lastFileAccessTimeChange?.Add(filename, 900000);
