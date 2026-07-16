@@ -219,11 +219,6 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 throw;
             }
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
         }
 
         private void ArchiveOneRegion(Scene scene, string regionDir, Dictionary<UUID, sbyte> assetUuids,
@@ -290,8 +285,6 @@ namespace OpenSim.Region.CoreModules.World.Archiver
 
                 assetGatherer.GatherAll();
 
-                GC.Collect();
-
                 int errors = assetGatherer.FailedUUIDs.Count;
                 m_log.DebugFormat(
                     "[ARCHIVER]: {0} region scene objects to save reference {1} possible assets",
@@ -349,7 +342,6 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             }
 
             Save(scene, sceneObjects, regionDir);
-            GC.Collect();
         }
 
         /// <summary>

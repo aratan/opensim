@@ -1,0 +1,24 @@
+============================================================
+  OpenSimulator Performance Benchmark Results
+  Date: jue 16 jul 2026 00:27:11 CEST
+============================================================
+
+=== SYSTEM INFORMATION ===
+CPU: 
+Cores: 24 ( threads)
+RAM: 30Gi
+Disk: 950G
+Kernel: 7.1.3-2-cachyos
+.NET SDK: 10.0.109
+
+=== COMPILATION BENCHMARK ===
+Build Time: 160256ms
+
+=== BINARY SIZE ANALYSIS ===
+OpenSim.dll: 
+OpenSim.Framework.dll: 
+OpenSim.Region.Framework.dll: 
+BepuPhysics.dll: 812K
+Total bin size: 7,4G
+
+=== MEMORY & GC PERFORMANCE ===

@@ -308,20 +308,20 @@ namespace OpenSim.Region.PhysicsModule.Bepu
 
             var actor = new BepuActor(this, localID, primName, position, Vector3.Zero,
                                        size, rotation, CalculateMass(size, isPhysical),
-                                       isPhysical, false);
+                                       isPhysical, false)
+            {
+                Shape = pbs
+            };
 
             // Create the Bepu body for this prim
             var snPosition = BepuUtil.ToSN(position);
             var snRotation = BepuUtil.ToSN(rotation);
-            var snSize = BepuUtil.ToSN(size);
 
             BodyHandle handle;
             TypedIndex shapeIndex = default;
             try
             {
-                var box = new Box(snSize.X, snSize.Y, snSize.Z);
-                shapeIndex = _simulation.Shapes.Add(box);
-                var inertia = box.ComputeInertia(actor.Mass);
+                shapeIndex = CreateBepuShape(pbs, size, actor.Mass, out var inertia);
 
                 var bodyDescription = CreateBodyDescription(
                     ref snPosition, ref snRotation, shapeIndex,
@@ -675,14 +675,16 @@ namespace OpenSim.Region.PhysicsModule.Bepu
             {
                 if (!actor.HasBody) return;
 
-                var snSize = BepuUtil.ToSN(actor.Size);
                 var body = _simulation.Bodies.GetBodyReference(actor.BodyHandle);
 
-                // Remove old shape, add new box
-                // TODO: support arbitrary shapes in Phase 4
+                // Remove old shape and recreate based on the actor's current shape/size.
                 _simulation.Shapes.Remove(body.Collidable.Shape);
-                var newBox = new Box(snSize.X, snSize.Y, snSize.Z);
-                body.Collidable.Shape = _simulation.Shapes.Add(newBox);
+                var newShapeIndex = CreateBepuShape(actor.PrimitiveBaseShape, actor.Size, actor.Mass, out var newInertia);
+                body.Collidable.Shape = newShapeIndex;
+
+                // Update inertia to match the new geometry.
+                if (actor.IsPhysical)
+                    body.SetLocalInertia(newInertia);
             });
         }
 
@@ -703,6 +705,67 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         #endregion
 
         #region Internal simulation plumbing
+
+        /// <summary>
+        /// Create a Bepu collider shape from an OpenSim PrimitiveBaseShape.
+        /// Maps OpenSim profile/path combinations to native Bepu shapes.
+        /// Returns the shape index and the inertia tensor for the given mass.
+        /// </summary>
+        private TypedIndex CreateBepuShape(PrimitiveBaseShape pbs, Vector3 size, float mass, out BodyInertia inertia)
+        {
+            // Default to a box if no shape information is provided.
+            if (pbs == null)
+            {
+                var box = new Box(size.X, size.Y, size.Z);
+                inertia = box.ComputeInertia(mass);
+                return _simulation.Shapes.Add(box);
+            }
+
+            var profile = pbs.ProfileShape;
+            var path = (Extrusion)pbs.PathCurve;
+
+            // Sphere: half-circle profile revolved (e.g. CreateSphere)
+            if (profile == ProfileShape.HalfCircle && path == Extrusion.Curve1)
+            {
+                float radius = Math.Max(size.X, Math.Max(size.Y, size.Z)) * 0.5f;
+                var sphere = new Sphere(radius);
+                inertia = sphere.ComputeInertia(mass);
+                return _simulation.Shapes.Add(sphere);
+            }
+
+            // Cylinder: circle profile extruded straight (e.g. CreateCylinder)
+            // NOTE: Bepu v2 Cylinder is Y-aligned by default, while OpenSim prims are
+            // Z-aligned. For full correctness this should be wrapped in a Compound with a 90°
+            // X rotation; that is left for a follow-up to avoid scope creep.
+            if (profile == ProfileShape.Circle && path == Extrusion.Straight)
+            {
+                float radius = Math.Max(size.X, size.Y) * 0.5f;
+                float length = size.Z;
+                var cylinder = new Cylinder(radius, length);
+                inertia = cylinder.ComputeInertia(mass);
+                return _simulation.Shapes.Add(cylinder);
+            }
+
+            // Capsule: half-circle profile extruded straight
+            // NOTE: Bepu v2 Capsule is Y-aligned by default, while OpenSim prims are
+            // Z-aligned. For full correctness this should be wrapped in a Compound with a 90°
+            // X rotation; that is left for a follow-up to avoid scope creep.
+            if (profile == ProfileShape.HalfCircle && path == Extrusion.Straight)
+            {
+                float radius = Math.Max(size.X, size.Y) * 0.5f;
+                float length = Math.Max(size.Z - 2f * radius, 0f);
+                var capsule = new Capsule(radius, length);
+                inertia = capsule.ComputeInertia(mass);
+                return _simulation.Shapes.Add(capsule);
+            }
+
+            // Box: square profile extruded straight (default)
+            {
+                var box = new Box(size.X, size.Y, size.Z);
+                inertia = box.ComputeInertia(mass);
+                return _simulation.Shapes.Add(box);
+            }
+        }
 
         private void ProcessScheduledUpdates()
         {
@@ -1091,6 +1154,12 @@ namespace OpenSim.Region.PhysicsModule.Bepu
 
             var rayOrigin = BepuUtil.ToSN(position);
             var rayDir = BepuUtil.ToSN(direction);
+            if (rayDir.LengthSquared() <= 0)
+            {
+                retMethod?.Invoke(false, Vector3.Zero, 0, 999999f, Vector3.Zero);
+                return;
+            }
+            rayDir = System.Numerics.Vector3.Normalize(rayDir);
 
             var hitHandler = new RayHitHandler();
             _simulation.RayCast(rayOrigin, rayDir, length, ref hitHandler, 0);
@@ -1142,6 +1211,9 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         {
             var rayOrigin = BepuUtil.ToSN(position);
             var rayDir = BepuUtil.ToSN(direction);
+            if (rayDir.LengthSquared() <= 0)
+                return new List<ContactResult>();
+            rayDir = System.Numerics.Vector3.Normalize(rayDir);
 
             var hitHandler = new MultiHitHandler
             {

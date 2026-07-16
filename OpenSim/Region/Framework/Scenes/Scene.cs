@@ -1596,9 +1596,6 @@ namespace OpenSim.Region.Framework.Scenes
                 m_heartbeatThread = null;
             }
 
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
             // tell physics to finish building actor
             m_sceneGraph.ProcessPhysicsPreSimulation();
 
@@ -1806,12 +1803,6 @@ namespace OpenSim.Region.Framework.Scenes
 
                     if (!LoginsEnabled && Frame == 20)
                     {
-                        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-                        GC.Collect();
-                        GC.WaitForPendingFinalizers();
-                        GC.Collect();
-                        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
-
                         if (!LoginLock)
                         {
                             if (!StartDisabled)
@@ -5979,12 +5970,6 @@ Environment.Exit(1);
         public void RegenerateMaptileAndReregister(object sender, ElapsedEventArgs e)
         {
             RegenerateMaptile();
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
 
             // We need to propagate the new image UUID to the grid service
             // so that all simulators can retrieve it

@@ -645,14 +645,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             m_killRecord.Clear();
             GroupsInView.Clear();
 
-            if(m_scene.GetNumberOfClients() == 0)
-            {
-                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
-            }
+
         }
 
         public void Kick(string message)

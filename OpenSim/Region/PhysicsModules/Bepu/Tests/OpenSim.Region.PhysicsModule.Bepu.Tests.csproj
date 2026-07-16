@@ -121,5 +121,8 @@
     <Compile Include="BodyToggle.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="ShapeTypes.cs">
+      <SubType>Code</SubType>
+    </Compile>
   </ItemGroup>
 </Project>

@@ -47,7 +47,7 @@ namespace OpenSim.Region.PhysicsModule.Bepu
         private bool _setAlwaysRun;
         private bool _phantom;
         private byte _physicsShapeType;
-        private PrimitiveBaseShape _shape;
+        private PrimitiveBaseShape _primitiveBaseShape;
         private float _density = 10f;
         private float _gravModifier = 1f;
         private float _friction = 0.5f;
@@ -143,8 +143,18 @@ namespace OpenSim.Region.PhysicsModule.Bepu
 
         public override PrimitiveBaseShape Shape
         {
-            set => _shape = value;
+            set
+            {
+                _primitiveBaseShape = value;
+                if (_hasBody)
+                    _scene.ScheduleShapeUpdate(this);
+            }
         }
+
+        /// <summary>
+        /// The OpenSim primitive shape used to build this actor's Bepu collider.
+        /// </summary>
+        internal PrimitiveBaseShape PrimitiveBaseShape => _primitiveBaseShape;
 
         public override uint LocalID
         {

@@ -1,6 +1,7 @@
 using Friflo.Engine.ECS;
 using OpenSim.Region.ECS.Components;
 using OpenMetaverse;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.ECS.World
 {
